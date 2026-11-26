@@ -31,7 +31,7 @@
 * **Start with Windows** - Optional, from the tray menu
 * **Nothing touched** - No injection, no patches, no game files; it reads the layer's window and the game's memory
 * **Auto-update** - Fetches new releases itself (on start, every six hours, or from the tray), checks their size and SHA-256 against GitHub, and keeps the previous exe as `vi-rpc.old.exe` until the new one has run for two minutes
-* **Logging** - What it does goes to `%LOCALAPPDATA%i-rpci-rpc.log` and to the console the tray can show
+* **Logging** - What it does goes to `%LOCALAPPDATA%\i-rpc\i-rpc.log` and to the console the tray can show
 * **Lightweight** - One small exe, nothing to configure, no runtime to install
 
 ## Upcoming
