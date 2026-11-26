@@ -26,6 +26,7 @@
 * **Works with every VIctory-based build** - VIctory, victory-fork, Belobug, DexNom, AvatarManz, CGBJ, Flamingo, VItoriaBr and their forks
 * **Live game state** - Menus, loading and the world, with the in-game clock read from the game itself
 * **Conditional** - Shows up when the game is running, clears when it closes
+* **Tray icon** - Lives in the system tray; its menu shows or hides the console and quits
 * **Nothing touched** - No injection, no patches, no game files; it reads the layer's window and the game's memory
 * **Auto-update** - Fetches new releases itself (on start and every six hours; `auto_update = false` turns it off)
 * **Lightweight** - One small exe, nothing to configure, no runtime to install
@@ -33,12 +34,11 @@
 ## Upcoming
 
 * Street and area from the game itself ("Standing near Port Gelhorn")
-* System tray icon
 * Other layers (XCL) and other game builds
 
 ## How To Use
 
-Run `vi-rpc.exe`, play... done! Start it before or after the game; the presence appears once the game runs and clears when it closes. No account, no setup: the Discord application is the project's own.
+Run `vi-rpc.exe`, play... done! It sits in the system tray (right-click: show the console, quit). Start it before or after the game; the presence appears once the game runs and clears when it closes. No account, no setup: the Discord application is the project's own.
 
 > **Note**
 > A layer's launcher can start it for you: add `start "" "C:\path\to\vi-rpc.exe" --exit-with-game` above the `victory.exe run ...` line; with that flag it quits when the game does.

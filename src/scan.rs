@@ -404,7 +404,7 @@ pub fn find(args: &[String]) {
         }
         println!("again: {} of {} saved places still match", places.len(), seen);
     } else {
-        let mut scan_chunk = |addr: usize, chunk: &[u8], places: &mut Vec<(usize, String)>| {
+        let scan_chunk = |addr: usize, chunk: &[u8], places: &mut Vec<(usize, String)>| {
             for (kind, pat, range) in &kinds {
                 if *range == 0 {
                     for i in find_all(chunk, pat) {
@@ -704,7 +704,7 @@ pub fn boxes(args: &[String]) {
     });
     println!("sweep: {:.1} GiB{}, {} boxes contain the point", bytes as f64 / (1u64 << 30) as f64, if complete { "" } else { " (budget hit)" }, hits.len());
     let mut text = String::new();
-    for (a, tag, b, ctx) in &hits {
+    for (a, _tag, b, ctx) in &hits {
         let line = format!("{a:#x} ({}) min ({:.1}, {:.1}, {:.1}) max ({:.1}, {:.1}, {:.1}) size {:.0}x{:.0}  ctx {}",
             t.owner(*a), b[0], b[1], b[2], b[3], b[4], b[5], b[3] - b[0], b[4] - b[1],
             ctx.iter().map(|v| format!("{v:08x}")).collect::<Vec<_>>().join(" "));
