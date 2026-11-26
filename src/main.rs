@@ -41,14 +41,14 @@ fn main() {
         Some("udiff") => return scan::udiff(&args[1..]),
         _ => {}
     }
+    // The project's own Discord application (its name and art are what Discord shows); one application serves
+    // every user, so no setup is needed. `vi-rpc.toml` next to the exe overrides it for people with their own.
+    const DEFAULT_APP_ID: &str = "1575527746090565632";
     let exe = std::env::current_exe().unwrap_or_default();
     let cfg_path = exe.with_file_name("vi-rpc.toml");
     let cfg: Config = match std::fs::read_to_string(&cfg_path).ok().and_then(|t| toml::from_str(&t).ok()) {
         Some(c) => c,
-        None => {
-            eprintln!("vi-rpc: put `app_id = \"<Discord application id>\"` in {}", cfg_path.display());
-            std::process::exit(2);
-        }
+        None => Config { app_id: DEFAULT_APP_ID.to_string(), interval: default_interval() },
     };
     let mut client: Option<DiscordIpcClient> = None;
     let mut started: Option<Instant> = None;
