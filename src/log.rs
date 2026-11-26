@@ -33,7 +33,14 @@ pub fn open_file() {
         LOG.lock().unwrap_or_else(|e| e.into_inner()).file = file;
     }
     std::panic::set_hook(Box::new(|info| {
-        say(format!("vi-rpc: PANIC {info}"));
+        // never wait for the log mutex here: the panicking thread may hold it
+        let line = format!("vi-rpc: PANIC {info}");
+        let _ = writeln!(std::io::stderr(), "{line}");
+        if let Some(p) = path() {
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(p) {
+                let _ = writeln!(f, "{} {line}", stamp());
+            }
+        }
     }));
 }
 
@@ -45,23 +52,28 @@ fn stamp() -> String {
 
 pub fn say(line: impl Into<String>) {
     let line = line.into();
-    let mut l = LOG.lock().unwrap_or_else(|e| e.into_inner());
+    {
+        let mut l = LOG.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(f) = l.file.as_mut() {
+            let _ = writeln!(f, "{} {line}", stamp());
+        }
+        if l.lines.len() >= 300 {
+            l.lines.pop_front();
+        }
+        l.lines.push_back(line.clone());
+    }
+    // outside the lock: a redirected stdout nobody reads must not freeze the tray and the file log
     let _ = writeln!(std::io::stdout(), "{line}");
-    if let Some(f) = l.file.as_mut() {
-        let _ = writeln!(f, "{} {line}", stamp());
-    }
-    if l.lines.len() >= 300 {
-        l.lines.pop_front();
-    }
-    l.lines.push_back(line);
 }
 
-/// Serialize console changes with writes; replay only when a new console was created.
+/// Runs a console change and, when it reports a new console, replays the lines so far into it. A line said
+/// while the console appears may show twice; nothing is lost from the file or the buffer.
 pub fn change_console(change: impl FnOnce() -> bool) {
-    let l = LOG.lock().unwrap_or_else(|e| e.into_inner());
-    if change() {
-        for line in l.lines.iter() {
-            let _ = writeln!(std::io::stdout(), "{line}");
-        }
+    if !change() {
+        return;
+    }
+    let snapshot: Vec<String> = LOG.lock().unwrap_or_else(|e| e.into_inner()).lines.iter().cloned().collect();
+    for line in snapshot {
+        let _ = writeln!(std::io::stdout(), "{line}");
     }
 }

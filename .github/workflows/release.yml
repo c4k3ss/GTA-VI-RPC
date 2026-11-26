@@ -20,7 +20,7 @@ jobs:
       - name: Check the tag matches Cargo.toml
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}".TrimStart("v")
+          $tag = $env:GITHUB_REF_NAME.TrimStart("v")
           $cargo = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
           if ($tag -ne $cargo) { Write-Error "tag $tag but Cargo.toml says $cargo"; exit 1 }
 

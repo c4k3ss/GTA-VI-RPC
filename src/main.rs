@@ -71,24 +71,19 @@ fn main() {
     let exit_with_game = args.iter().any(|a| a == "--exit-with-game");
     // one instance at a time: a named mutex held for the life of the process (the updater lets go of it
     // just before it starts the new exe)
-    // SAFETY: a plain Win32 call with a static name.
-    unsafe {
-        use windows_sys::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS};
-        use windows_sys::Win32::System::Threading::CreateMutexW;
-        let name: Vec<u16> = "vi-rpc-single-instance\0".encode_utf16().collect();
-        let h = CreateMutexW(std::ptr::null(), 0, name.as_ptr());
-        if h.is_null() || GetLastError() == ERROR_ALREADY_EXISTS {
-            use windows_sys::Win32::System::Console::{AttachConsole, GetConsoleWindow, ATTACH_PARENT_PROCESS};
-            use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONINFORMATION, MB_OK};
+    if !app::claim_instance() {
+        use windows_sys::Win32::System::Console::{AttachConsole, GetConsoleWindow, ATTACH_PARENT_PROCESS};
+        use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONINFORMATION, MB_OK};
+        // SAFETY: plain Win32 calls with NUL-terminated strings that outlive them.
+        unsafe {
             if GetConsoleWindow().is_null() && AttachConsole(ATTACH_PARENT_PROCESS) == 0 {
                 let message: Vec<u16> = "GTA VI RPC is already running (look for its icon in the tray).\0".encode_utf16().collect();
                 let caption: Vec<u16> = "GTA VI RPC\0".encode_utf16().collect();
                 MessageBoxW(std::ptr::null_mut(), message.as_ptr(), caption.as_ptr(), MB_OK | MB_ICONINFORMATION);
             }
-            log::say("vi-rpc: already running");
-            return;
         }
-        app::INSTANCE_MUTEX.store(h as isize, Ordering::SeqCst);
+        log::say("vi-rpc: already running");
+        return;
     }
     log::open_file();
     let exe = std::env::current_exe().unwrap_or_default();
@@ -115,12 +110,9 @@ fn main() {
     // the tray runs here; the console starts hidden unless --console was given
     let quit = tray::run(start_hidden);
     if quit {
-        app::STOP.store(true, Ordering::Relaxed);
-        // never cut an exe swap in half
-        let t0 = Instant::now();
-        while app::UPDATING.load(Ordering::SeqCst) && t0.elapsed() < Duration::from_secs(60) {
-            std::thread::sleep(Duration::from_millis(100));
-        }
+        app::STOP.store(true, Ordering::SeqCst);
+        // never cut an exe swap in half: the updater holds this lock from the first rename to the spawn
+        let _swap = app::SWAP.lock().unwrap_or_else(|e| e.into_inner());
         log::say("vi-rpc: quit from the tray");
         std::process::exit(0);
     }
@@ -260,6 +252,10 @@ fn presence(cfg: Config, exit_with_game: bool) {
         for _ in 0..cfg.interval.clamp(5, 3600) * 4 {
             if app::STOP.load(Ordering::Relaxed) {
                 return;
+            }
+            // Pause, Resume and Check for updates act now, not after the interval
+            if app::PAUSED.load(Ordering::Relaxed) != paused || app::CHECK_NOW.load(Ordering::Relaxed) {
+                break;
             }
             std::thread::sleep(Duration::from_millis(250));
         }

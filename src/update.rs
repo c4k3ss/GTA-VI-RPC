@@ -143,38 +143,38 @@ pub fn check_and_apply(manual: bool) -> bool {
         let _ = std::fs::remove_file(&fresh);
         return false;
     }
-    // From here until the new process runs, Quit waits (app::UPDATING) so the swap is never left half done.
-    app::UPDATING.store(true, Ordering::SeqCst);
+    // Quit takes the same lock before it exits, so the swap is never left half done; and if Quit got there
+    // first, there is nothing to update any more.
+    let _swap = app::SWAP.lock().unwrap_or_else(|e| e.into_inner());
+    if app::STOP.load(Ordering::SeqCst) {
+        let _ = std::fs::remove_file(&fresh);
+        return false;
+    }
     let _ = std::fs::remove_file(&old);
     if let Err(e) = std::fs::rename(&exe, &old).and_then(|_| std::fs::rename(&fresh, &exe)) {
         crate::log::say(format!("vi-rpc: could not swap the files ({e})"));
         let _ = std::fs::rename(&old, &exe);
-        app::UPDATING.store(false, Ordering::SeqCst);
+        let _ = std::fs::remove_file(&fresh);
         return false;
     }
     // Let go of the single-instance mutex before the new exe starts, or it would see us and quit.
-    release_instance_mutex();
+    app::release_instance();
     match std::process::Command::new(&exe).args(std::env::args().skip(1)).spawn() {
         Ok(_) => {
             crate::log::say(format!("vi-rpc: updated to {}; restarting", rel.tag));
-            app::UPDATING.store(false, Ordering::SeqCst);
             true
         }
         Err(e) => {
             crate::log::say(format!("vi-rpc: the new version did not start ({e}); restoring"));
             let _ = std::fs::rename(&exe, &fresh);
             let _ = std::fs::rename(&old, &exe);
-            app::UPDATING.store(false, Ordering::SeqCst);
+            let _ = std::fs::remove_file(&fresh);
+            if !app::claim_instance() {
+                crate::log::say("vi-rpc: another copy took over meanwhile; stopping this one");
+                app::STOP.store(true, Ordering::SeqCst);
+            }
             false
         }
-    }
-}
-
-fn release_instance_mutex() {
-    let h = app::INSTANCE_MUTEX.swap(0, Ordering::SeqCst);
-    if h != 0 {
-        // SAFETY: the handle CreateMutexW gave main(); closed exactly once here.
-        unsafe { windows_sys::Win32::Foundation::CloseHandle(h as _) };
     }
 }
 

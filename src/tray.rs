@@ -24,13 +24,15 @@ pub fn attach_or_alloc_console() {
 
 /// A console exists only while it is shown: made on demand (with the lines so far), freed when hidden.
 fn show_console(show: bool) {
-    // SAFETY: plain Win32 console calls, serialized with log writes and replay.
+    // SAFETY: plain Win32 console calls.
     crate::log::change_console(|| unsafe {
         if show {
             if GetConsoleWindow().is_null() && AllocConsole() != 0 {
                 let title: Vec<u16> = format!("GTA VI RPC {}\0", crate::update::VERSION).encode_utf16().collect();
                 SetConsoleTitleW(title.as_ptr());
-                return true;
+                // replay only when stdout now is that console (a redirected stdout stays where it was)
+                let mut mode = 0;
+                return GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &mut mode) != 0;
             }
         } else if !GetConsoleWindow().is_null() {
             let streams = [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE];
