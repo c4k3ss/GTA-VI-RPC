@@ -2,3 +2,5 @@
 app_id = "<your Discord application id>"
 # Seconds between presence updates (Discord allows one per 15 s).
 interval = 15
+# Fetch and install newer releases from GitHub (on start and every six hours).
+auto_update = true

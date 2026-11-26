@@ -25,6 +25,7 @@
 * **Live game state** - Menus, loading and the world, with the in-game clock read from the game itself
 * **Conditional** - Shows up when the game is running, clears when it closes
 * **Nothing touched** - No injection, no patches, no game files; it reads the layer's window and the game's memory
+* **Auto-update** - Fetches new releases itself (on start and every six hours; `auto_update = false` turns it off)
 * **Lightweight** - One small exe, nothing to configure, no runtime to install
 
 ## How To Use

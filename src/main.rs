@@ -15,6 +15,7 @@ use serde::Deserialize;
 mod layer;
 mod scan;
 mod title;
+mod update;
 
 #[derive(Deserialize)]
 struct Config {
@@ -22,6 +23,13 @@ struct Config {
     /// Seconds between presence updates (Discord allows one per 15 s).
     #[serde(default = "default_interval")]
     interval: u64,
+    /// Fetch and install newer releases from GitHub (on start and every six hours).
+    #[serde(default = "default_true")]
+    auto_update: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_interval() -> u64 {
@@ -48,12 +56,24 @@ fn main() {
     let cfg_path = exe.with_file_name("vi-rpc.toml");
     let cfg: Config = match std::fs::read_to_string(&cfg_path).ok().and_then(|t| toml::from_str(&t).ok()) {
         Some(c) => c,
-        None => Config { app_id: DEFAULT_APP_ID.to_string(), interval: default_interval() },
+        None => Config { app_id: DEFAULT_APP_ID.to_string(), interval: default_interval(), auto_update: true },
     };
+    println!("vi-rpc {}", update::VERSION);
+    update::clean_old();
+    let mut next_update_check = Instant::now();
     let mut client: Option<DiscordIpcClient> = None;
     let mut started: Option<Instant> = None;
     let mut last_shown = String::new();
     loop {
+        if cfg.auto_update && Instant::now() >= next_update_check {
+            next_update_check = Instant::now() + Duration::from_secs(6 * 3600);
+            if update::check_and_apply() {
+                if let Some(c) = client.as_mut() {
+                    let _ = c.close();
+                }
+                return;
+            }
+        }
         let frame = layer::find();
         match frame {
             None => {
