@@ -7,6 +7,8 @@
 //!
 //! Config: `vi-rpc.toml` next to the exe, `app_id = "<Discord application id>"`.
 
+#![windows_subsystem = "windows"]
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -15,6 +17,7 @@ use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use serde::Deserialize;
 
 mod layer;
+mod log;
 mod scan;
 mod state;
 mod title;
@@ -45,6 +48,10 @@ fn default_interval() -> u64 {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| !a.starts_with("--")) {
+        // a scanner command: write into the console this was started from (a .bat window), else make one
+        tray::attach_or_alloc_console();
+    }
     match args.first().map(String::as_str) {
         Some("scan") => return scan::run(&args[1..]),
         Some("find") | Some("clock") | Some("text") => return scan::find(&args[1..]),
@@ -68,7 +75,7 @@ fn main() {
         let name: Vec<u16> = "vi-rpc-single-instance\0".encode_utf16().collect();
         let h = CreateMutexW(std::ptr::null(), 0, name.as_ptr());
         if h.is_null() || GetLastError() == ERROR_ALREADY_EXISTS {
-            eprintln!("vi-rpc: already running");
+            log::say(format!("vi-rpc: already running"));
             return;
         }
     }
@@ -78,7 +85,7 @@ fn main() {
         Some(c) => c,
         None => Config { app_id: DEFAULT_APP_ID.to_string(), interval: default_interval(), auto_update: true, hide_console: true },
     };
-    println!("vi-rpc {}", update::VERSION);
+    log::say(format!("vi-rpc {}", update::VERSION));
     update::clean_old();
     let start_hidden = cfg.hide_console && !args.iter().any(|a| a == "--console");
     let stop = Arc::new(AtomicBool::new(false));
@@ -92,7 +99,7 @@ fn main() {
     // the tray runs here; the console starts hidden unless --console was given
     tray::run(stop.clone(), start_hidden);
     if !stop.load(Ordering::Relaxed) {
-        println!("vi-rpc: quit from the tray");
+        log::say(format!("vi-rpc: quit from the tray"));
         std::process::exit(0);
     }
     let _ = worker.join();
@@ -123,7 +130,7 @@ fn presence(cfg: Config, exit_with_game: bool, stop: Arc<AtomicBool>) {
         match frame {
             None => {
                 if client.is_some() {
-                    println!("vi-rpc: the game is gone; clearing presence");
+                    log::say(format!("vi-rpc: the game is gone; clearing presence"));
                     if let Some(c) = client.as_mut() {
                         let _ = c.clear_activity();
                         let _ = c.close();
@@ -132,7 +139,7 @@ fn presence(cfg: Config, exit_with_game: bool, stop: Arc<AtomicBool>) {
                     started = None;
                 }
                 if exit_with_game && seen_game {
-                    println!("vi-rpc: exiting with the game (--exit-with-game)");
+                    log::say(format!("vi-rpc: exiting with the game (--exit-with-game)"));
                     return;
                 }
             }
@@ -142,11 +149,11 @@ fn presence(cfg: Config, exit_with_game: bool, stop: Arc<AtomicBool>) {
                     let mut c = DiscordIpcClient::new(&cfg.app_id).expect("client");
                     match c.connect() {
                         Ok(()) => {
-                            println!("vi-rpc: connected to Discord");
+                            log::say(format!("vi-rpc: connected to Discord"));
                             client = Some(c);
                             started = Some(Instant::now());
                         }
-                        Err(e) => eprintln!("vi-rpc: Discord not reachable ({e}); retrying"),
+                        Err(e) => log::say(format!("vi-rpc: Discord not reachable ({e}); retrying")),
                     }
                 }
                 if let (Some(c), Some(t0)) = (client.as_mut(), started) {
@@ -164,7 +171,7 @@ fn presence(cfg: Config, exit_with_game: bool, stop: Arc<AtomicBool>) {
                         None => f.state(),
                     };
                     if let Some(p) = camera {
-                        println!("vi-rpc: camera at ({:.1}, {:.1}, {:.1})", p[0], p[1], p[2]);
+                        log::say(format!("vi-rpc: camera at ({:.1}, {:.1}, {:.1})", p[0], p[1], p[2]));
                     }
                     let details = match (&told.mission, f.scene()) {
                         (Some(m), layer::Scene::World) => m.clone(),
@@ -183,12 +190,12 @@ fn presence(cfg: Config, exit_with_game: bool, stop: Arc<AtomicBool>) {
                     match c.set_activity(act) {
                         Ok(()) => {
                             if shown != last_shown {
-                                println!("vi-rpc: {shown}");
+                                log::say(format!("vi-rpc: {shown}"));
                                 last_shown = shown;
                             }
                         }
                         Err(e) => {
-                            eprintln!("vi-rpc: update failed ({e}); reconnecting");
+                            log::say(format!("vi-rpc: update failed ({e}); reconnecting"));
                             client = None;
                         }
                     }

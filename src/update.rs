@@ -67,14 +67,14 @@ pub fn check_and_apply() -> bool {
         Ok(Some(r)) => r,
         Ok(None) => return false,
         Err(e) => {
-            eprintln!("vi-rpc: update check failed ({e})");
+            crate::log::say(format!("vi-rpc: update check failed ({e})"));
             return false;
         }
     };
     if !newer(&rel.tag, VERSION) {
         return false;
     }
-    println!("vi-rpc: version {} is out (this is {VERSION}); updating", rel.tag);
+    crate::log::say(format!("vi-rpc: version {} is out (this is {VERSION}); updating", rel.tag));
     let exe: PathBuf = match std::env::current_exe() {
         Ok(p) => p,
         Err(_) => return false,
@@ -82,30 +82,30 @@ pub fn check_and_apply() -> bool {
     let fresh = exe.with_file_name("vi-rpc.new.exe");
     let old = exe.with_file_name("vi-rpc.old.exe");
     if let Err(e) = download(&rel.url, &fresh) {
-        eprintln!("vi-rpc: download failed ({e})");
+        crate::log::say(format!("vi-rpc: download failed ({e})"));
         let _ = std::fs::remove_file(&fresh);
         return false;
     }
     // a sane download: a PE file of a plausible size
     let ok = std::fs::read(&fresh).map(|d| d.len() > 500_000 && d.starts_with(b"MZ")).unwrap_or(false);
     if !ok {
-        eprintln!("vi-rpc: the download does not look like the program; keeping this version");
+        crate::log::say(format!("vi-rpc: the download does not look like the program; keeping this version"));
         let _ = std::fs::remove_file(&fresh);
         return false;
     }
     let _ = std::fs::remove_file(&old);
     if let Err(e) = std::fs::rename(&exe, &old).and_then(|_| std::fs::rename(&fresh, &exe)) {
-        eprintln!("vi-rpc: could not swap the files ({e})");
+        crate::log::say(format!("vi-rpc: could not swap the files ({e})"));
         let _ = std::fs::rename(&old, &exe);
         return false;
     }
     match std::process::Command::new(&exe).args(std::env::args().skip(1)).spawn() {
         Ok(_) => {
-            println!("vi-rpc: updated to {}; restarting", rel.tag);
+            crate::log::say(format!("vi-rpc: updated to {}; restarting", rel.tag));
             true
         }
         Err(e) => {
-            eprintln!("vi-rpc: the new version did not start ({e}); restoring");
+            crate::log::say(format!("vi-rpc: the new version did not start ({e}); restoring"));
             let _ = std::fs::rename(&exe, &fresh);
             let _ = std::fs::rename(&old, &exe);
             false

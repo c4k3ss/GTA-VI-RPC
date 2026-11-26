@@ -7,17 +7,31 @@ use std::time::Duration;
 
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{Icon, TrayIconBuilder};
-use windows_sys::Win32::System::Console::GetConsoleWindow;
-use windows_sys::Win32::UI::WindowsAndMessaging::{DispatchMessageW, PeekMessageW, ShowWindow, TranslateMessage, MSG, PM_REMOVE, SW_HIDE, SW_SHOW};
+use windows_sys::Win32::System::Console::{AllocConsole, AttachConsole, FreeConsole, GetConsoleWindow, SetConsoleTitleW, ATTACH_PARENT_PROCESS};
+use windows_sys::Win32::UI::WindowsAndMessaging::{DispatchMessageW, PeekMessageW, TranslateMessage, MSG, PM_REMOVE};
 
-fn show_console(show: bool) {
-    // SAFETY: plain Win32 calls on our own console window (null when there is none).
+/// The scanner commands print a lot: use the console they were started from, or make one.
+pub fn attach_or_alloc_console() {
+    // SAFETY: plain Win32 console calls.
     unsafe {
-        let w = GetConsoleWindow();
-        if !w.is_null() {
-            // the first ShowWindow call of a process is overridden by how it was started: call it twice
-            ShowWindow(w, if show { SW_SHOW } else { SW_HIDE });
-            ShowWindow(w, if show { SW_SHOW } else { SW_HIDE });
+        if AttachConsole(ATTACH_PARENT_PROCESS) == 0 {
+            AllocConsole();
+        }
+    }
+}
+
+/// A console exists only while it is shown: made on demand (with the lines so far), freed when hidden.
+fn show_console(show: bool) {
+    // SAFETY: plain Win32 console calls; Rust's stdout looks the handle up on every write.
+    unsafe {
+        if show {
+            if GetConsoleWindow().is_null() && AllocConsole() != 0 {
+                let title: Vec<u16> = format!("GTA VI RPC {}\0", crate::update::VERSION).encode_utf16().collect();
+                SetConsoleTitleW(title.as_ptr());
+                crate::log::replay();
+            }
+        } else if !GetConsoleWindow().is_null() {
+            FreeConsole();
         }
     }
 }
@@ -39,7 +53,7 @@ pub fn run(stop: Arc<AtomicBool>, start_hidden: bool) {
     let _tray = match builder.build() {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("vi-rpc: no tray icon ({e}); the console stays");
+            crate::log::say(format!("vi-rpc: no tray icon ({e})"));
             show_console(true);
             while !stop.load(Ordering::Relaxed) {
                 std::thread::sleep(Duration::from_millis(500));
