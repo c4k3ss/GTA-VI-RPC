@@ -62,14 +62,24 @@ pub fn say(line: impl Into<String>) {
         }
         l.lines.push_back(line.clone());
     }
-    // outside the lock: a redirected stdout nobody reads must not freeze the tray and the file log
-    let _ = writeln!(std::io::stdout(), "{line}");
+    // only to a console: a redirected stdout nobody reads would block here (the file has every line)
+    if stdout_is_console() {
+        let _ = writeln!(std::io::stdout(), "{line}");
+    }
+}
+
+/// Whether stdout is a console right now (a pipe or file could block a write; a console cannot).
+pub fn stdout_is_console() -> bool {
+    use windows_sys::Win32::System::Console::{GetConsoleMode, GetStdHandle, STD_OUTPUT_HANDLE};
+    let mut mode = 0;
+    // SAFETY: plain Win32 queries.
+    unsafe { GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &mut mode) != 0 }
 }
 
 /// Runs a console change and, when it reports a new console, replays the lines so far into it. A line said
 /// while the console appears may show twice; nothing is lost from the file or the buffer.
 pub fn change_console(change: impl FnOnce() -> bool) {
-    if !change() {
+    if !change() || !stdout_is_console() {
         return;
     }
     let snapshot: Vec<String> = LOG.lock().unwrap_or_else(|e| e.into_inner()).lines.iter().cloned().collect();

@@ -30,9 +30,7 @@ fn show_console(show: bool) {
             if GetConsoleWindow().is_null() && AllocConsole() != 0 {
                 let title: Vec<u16> = format!("GTA VI RPC {}\0", crate::update::VERSION).encode_utf16().collect();
                 SetConsoleTitleW(title.as_ptr());
-                // replay only when stdout now is that console (a redirected stdout stays where it was)
-                let mut mode = 0;
-                return GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &mut mode) != 0;
+                return true;
             }
         } else if !GetConsoleWindow().is_null() {
             let streams = [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE];

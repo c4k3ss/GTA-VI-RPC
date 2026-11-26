@@ -165,10 +165,11 @@ pub fn check_and_apply(manual: bool) -> bool {
             true
         }
         Err(e) => {
-            crate::log::say(format!("vi-rpc: the new version did not start ({e}); restoring"));
+            // files first, words after: nothing should stand between a failed start and the rollback
             let _ = std::fs::rename(&exe, &fresh);
             let _ = std::fs::rename(&old, &exe);
             let _ = std::fs::remove_file(&fresh);
+            crate::log::say(format!("vi-rpc: the new version did not start ({e}); restored this one"));
             if !app::claim_instance() {
                 crate::log::say("vi-rpc: another copy took over meanwhile; stopping this one");
                 app::STOP.store(true, Ordering::SeqCst);
