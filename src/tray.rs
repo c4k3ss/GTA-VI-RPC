@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{Icon, TrayIconBuilder};
-use windows_sys::Win32::System::Console::{AllocConsole, AttachConsole, FreeConsole, GetConsoleWindow, SetConsoleTitleW, ATTACH_PARENT_PROCESS};
+use windows_sys::Win32::System::Console::{AllocConsole, AttachConsole, FreeConsole, GetConsoleMode, GetConsoleWindow, GetStdHandle, SetConsoleTitleW, SetStdHandle, ATTACH_PARENT_PROCESS, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
 use windows_sys::Win32::UI::WindowsAndMessaging::{DispatchMessageW, PeekMessageW, TranslateMessage, MSG, PM_REMOVE};
 
 /// The scanner commands print a lot: use the console they were started from, or make one.
@@ -22,18 +22,31 @@ pub fn attach_or_alloc_console() {
 
 /// A console exists only while it is shown: made on demand (with the lines so far), freed when hidden.
 fn show_console(show: bool) {
-    // SAFETY: plain Win32 console calls; Rust's stdout looks the handle up on every write.
-    unsafe {
+    // SAFETY: plain Win32 console calls, serialized with log writes and replay.
+    crate::log::change_console(|| unsafe {
         if show {
             if GetConsoleWindow().is_null() && AllocConsole() != 0 {
                 let title: Vec<u16> = format!("GTA VI RPC {}\0", crate::update::VERSION).encode_utf16().collect();
                 SetConsoleTitleW(title.as_ptr());
-                crate::log::replay();
+                return true;
             }
         } else if !GetConsoleWindow().is_null() {
-            FreeConsole();
+            let streams = [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE];
+            let console_handles = streams.map(|stream| {
+                let mut mode = 0;
+                GetConsoleMode(GetStdHandle(stream), &mut mode) != 0
+            });
+            if FreeConsole() != 0 {
+                // Detached console handles can be reused by unrelated files. Preserve redirected streams.
+                for (stream, was_console) in streams.into_iter().zip(console_handles) {
+                    if was_console {
+                        SetStdHandle(stream, std::ptr::null_mut());
+                    }
+                }
+            }
         }
-    }
+        false
+    });
 }
 
 /// Runs until Quit is chosen or `stop` is set by the presence thread (an update restart). Returns on quit.

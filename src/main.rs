@@ -75,6 +75,13 @@ fn main() {
         let name: Vec<u16> = "vi-rpc-single-instance\0".encode_utf16().collect();
         let h = CreateMutexW(std::ptr::null(), 0, name.as_ptr());
         if h.is_null() || GetLastError() == ERROR_ALREADY_EXISTS {
+            use windows_sys::Win32::System::Console::{AttachConsole, GetConsoleWindow, ATTACH_PARENT_PROCESS};
+            use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONINFORMATION, MB_OK};
+            if GetConsoleWindow().is_null() && AttachConsole(ATTACH_PARENT_PROCESS) == 0 {
+                let message: Vec<u16> = "vi-rpc: already running\0".encode_utf16().collect();
+                let caption: Vec<u16> = "GTA VI RPC\0".encode_utf16().collect();
+                MessageBoxW(std::ptr::null_mut(), message.as_ptr(), caption.as_ptr(), MB_OK | MB_ICONINFORMATION);
+            }
             log::say(format!("vi-rpc: already running"));
             return;
         }
