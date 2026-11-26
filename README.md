@@ -1,53 +1,67 @@
-# vi-rpc
+<h1 align="center">
+  <br>
+  <a href="https://github.com/c4k3ss/vi-rpc"><img src="https://raw.githubusercontent.com/c4k3ss/vi-rpc/main/logo.png" alt="VI RPC" width="200"></a>
+  <br>
+  VI RPC
+  <br>
+</h1>
 
-Discord Rich Presence for the Xbox Series build of Grand Theft Auto VI running on a PC through a
-[VIctory](https://github.com/Marvisak/VIctory)-lineage layer (VIctory itself, victory-fork, Belobug, DexNom,
-AvatarManz, CGBJ, Flamingo, VItoriaBr and their forks).
+<h4 align="center">Discord Rich Presence for GTA VI on PC</h4>
 
-```
-Grand Theft Auto VI
-Playing Story Mode
-Somewhere in Leonida · 5:17 PM
-15:06 elapsed
-```
+<p align="center">
+  <a href="#key-features">Key Features</a> •
+  <a href="#how-to-use">How To Use</a> •
+  <a href="#download">Download</a> •
+  <a href="#how-it-works">How It Works</a> •
+  <a href="#building-from-source">Building From Source</a> •
+  <a href="#license">License</a>
+</p>
 
-It is a separate program. It patches nothing, injects nothing, and ships no game data: it reads the layer's
-window title (frame rate and draw count, which tell menus from the world) and, for a known game build, a few
-values from the running process's memory (the in-game clock; the camera position, kept for later). Everything
-in this repository is offsets and code.
+<p align="center"><img src="https://raw.githubusercontent.com/c4k3ss/vi-rpc/main/presence.png"></p>
 
-## Use
+## Key Features
 
-1. Build it (Rust stable, Windows): `cargo build --release`. The exe is `target\release\vi-rpc.exe`.
-2. Make a Discord application at <https://discord.com/developers/applications>: its name is what Discord shows
-   as "Playing ...", and under Rich Presence > Art Assets upload one image named `game`.
-3. Put `vi-rpc.toml` next to the exe:
+* **Works with every VIctory-based build** - VIctory, victory-fork, Belobug, DexNom, AvatarManz, CGBJ, Flamingo, VItoriaBr and their forks
+* **Live game state** - Menus, loading and the world, with the in-game clock read from the game itself
+* **Conditional** - Shows up when the game is running, clears when it closes
+* **Nothing touched** - No injection, no patches, no game files; it reads the layer's window and the game's memory
+* **Lightweight** - One small exe, one config file, no runtime to install
+
+## How To Use
+
+1. Create a Discord application at [discord.com/developers](https://discord.com/developers/applications). Its name is what Discord shows as "Playing ...". Under *Rich Presence > Art Assets*, upload an image named `game`.
+2. Put `vi-rpc.toml` next to `vi-rpc.exe` (see `vi-rpc.example.toml`):
    ```toml
    app_id = "<your application id>"
-   interval = 15          # seconds between updates; Discord allows one per 15 s
    ```
-4. Run `vi-rpc.exe` while the game runs (or before: it waits for the game and clears the presence when the
-   game exits). A layer's launcher can start it, e.g. `start "" vi-rpc.exe` before the `victory.exe run ...`
-   line.
+3. Run `vi-rpc.exe`. Start the game whenever you like; the presence appears once it runs.
 
-## What it reads
+> **Note**
+> A layer's launcher can start it for you: add `start "" "<path>\vi-rpc.exe"` above the `victory.exe run ...` line.
 
-| Shown | Source |
-|---|---|
-| menus / loading / world, fps | the layer's window title, `<title> \| VIctory <fps> fps <ms> ms/frame <draws> draws/frame` |
-| the in-game clock | the title image, build `1.0.2.1` (`victory-image-b99f876b74d4a77f.dll` as the layer maps it): six `u32` at `+0x74df88c` (day, month, year, hour, minute, second) |
-| the camera position (console only for now) | the view-projection matrix at `+0x74def10`: world position = `-t * inv(R)` |
+## Download
 
-Other game builds need their own offsets: the image's name carries the build's hash, and `src/title.rs` maps
-hashes to layouts. Other layers need the window title pattern and the image's name added in `src/layer.rs` and
-`src/title.rs`.
+You can [download](https://github.com/c4k3ss/vi-rpc/releases) the latest version for Windows.
 
-## Finding offsets (`vi-rpc scan`, `clock`, `text`, `find`, `chase`, `peek`, `snap`, `diff`, `udiff`, `boxes`)
+**Requirements:** Windows 10/11, Discord running on your PC, a VIctory-based layer.
 
-The same exe holds the scanner that found the offsets: value scans narrowed over time (`clock --image 17 10`,
-then `--again` as the clock moves), string scans, pointer chases and snapshot diffs of the title image. The
-`*.bat` files in the repository root drive them; `PLAN.md` has the notes. They read the process only.
+## How It Works
 
-## Licence
+The layer names its window `<title> | VIctory <fps> fps <ms> ms/frame <draws> draws/frame`; the draw count tells menus from the world. For a known game build, a few values are read from the running process: the clock (day, month, year, hour, minute, second) and the camera position, at fixed offsets in the game's image. The offsets are keyed by the build's hash, which the layer puts in the image's module name, so other builds can be added in `src/title.rs`.
 
-MIT. VIctory and its forks are GPL-3.0; this tool contains none of their code.
+The same exe contains the scanner that found those offsets (`vi-rpc clock`, `scan`, `snap`, `diff`, ...). The `*.bat` files drive it; `PLAN.md` has the notes.
+
+## Building From Source
+
+```bash
+# Prerequisites: Rust (stable), Windows
+
+git clone https://github.com/c4k3ss/vi-rpc.git
+cd vi-rpc
+cargo build --release
+# target\release\vi-rpc.exe
+```
+
+## License
+
+[MIT](LICENSE). VIctory and its forks are GPL-3.0; this tool contains none of their code.
