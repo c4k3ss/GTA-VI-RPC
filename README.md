@@ -13,6 +13,7 @@
   <a href="#how-to-use">How To Use</a> •
   <a href="#download">Download</a> •
   <a href="#how-it-works">How It Works</a> •
+  <a href="#for-layer-developers">For Layer Developers</a> •
   <a href="#building-from-source">Building From Source</a> •
   <a href="#license">License</a>
 </p>
@@ -48,6 +49,18 @@ You can [download](https://github.com/c4k3ss/GTA-VI-RPC/releases) the latest ver
 The layer names its window `<title> | VIctory <fps> fps <ms> ms/frame <draws> draws/frame`; the draw count tells menus from the world. For a known game build, a few values are read from the running process: the clock (day, month, year, hour, minute, second) and the camera position, at fixed offsets in the game's image. The offsets are keyed by the build's hash, which the layer puts in the image's module name, so other builds can be added in `src/title.rs`.
 
 The same exe contains the scanner that found those offsets (`vi-rpc clock`, `scan`, `snap`, `diff`, ...). The `*.bat` files drive it; `PLAN.md` has the notes.
+
+## For Layer Developers
+
+Three ways to support it, from nothing to full:
+
+1. **Bundle it.** Ship `vi-rpc.exe` next to your launcher and start it before the game: `start "" vi-rpc.exe` in a batch file, or `Command::new("vi-rpc.exe").spawn()` in Rust. It updates itself from this repository's releases, so you never rebuild for it. Make it opt-in or opt-out as you prefer.
+2. **Keep the window title.** All the tool needs from the layer is the title `<name> | VIctory <fps> fps <ms> ms/frame <draws> draws/frame`. Keep that format and you are supported.
+3. **Tell it more.** Things the layer knows (the scene, the mission, the street) can go into `%LOCALAPPDATA%i-rpc\state.json`, rewritten whenever they change; the tool prefers that file over its own readings. Fields, all optional:
+   ```json
+   { "scene": "world", "mission": "Gone Fishing", "street": "Sunset Dr", "area": "Key Lento", "activity": "driving" }
+   ```
+   (The file interface lands in the next release; this is its shape.)
 
 ## Building From Source
 
