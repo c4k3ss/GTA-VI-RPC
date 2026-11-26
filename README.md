@@ -56,7 +56,7 @@ Three ways to support it, from nothing to full:
 
 1. **Bundle it.** Ship `vi-rpc.exe` next to your launcher and start it before the game: `start "" vi-rpc.exe` in a batch file, or `Command::new("vi-rpc.exe").spawn()` in Rust. It updates itself from this repository's releases, so you never rebuild for it. Make it opt-in or opt-out as you prefer.
 2. **Keep the window title.** All the tool needs from the layer is the title `<name> | VIctory <fps> fps <ms> ms/frame <draws> draws/frame`. Keep that format and you are supported.
-3. **Tell it more.** Things the layer knows (the scene, the mission, the street) can go into `%LOCALAPPDATA%i-rpc\state.json`, rewritten whenever they change; the tool prefers that file over its own readings. Fields, all optional:
+3. **Tell it more.** Things the layer knows (the scene, the mission, the street) can go into `%LOCALAPPDATA%\vi-rpc\state.json`, rewritten whenever they change; the tool prefers that file over its own readings. Fields, all optional:
    ```json
    { "scene": "world", "mission": "Gone Fishing", "street": "Sunset Dr", "area": "Key Lento", "activity": "driving" }
    ```
