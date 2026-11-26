@@ -15,6 +15,8 @@ fn show_console(show: bool) {
     unsafe {
         let w = GetConsoleWindow();
         if !w.is_null() {
+            // the first ShowWindow call of a process is overridden by how it was started: call it twice
+            ShowWindow(w, if show { SW_SHOW } else { SW_HIDE });
             ShowWindow(w, if show { SW_SHOW } else { SW_HIDE });
         }
     }

@@ -4,3 +4,5 @@ app_id = "<your Discord application id>"
 interval = 15
 # Fetch and install newer releases from GitHub (on start and every six hours).
 auto_update = true
+# Start with the console hidden; the tray menu shows it. `vi-rpc.exe --console` overrides for one run.
+hide_console = true

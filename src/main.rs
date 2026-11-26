@@ -30,6 +30,9 @@ struct Config {
     /// Fetch and install newer releases from GitHub (on start and every six hours).
     #[serde(default = "default_true")]
     auto_update: bool,
+    /// Start with the console hidden (the tray menu shows it); `--console` on the command line overrides.
+    #[serde(default = "default_true")]
+    hide_console: bool,
 }
 
 fn default_true() -> bool {
@@ -73,10 +76,11 @@ fn main() {
     let cfg_path = exe.with_file_name("vi-rpc.toml");
     let cfg: Config = match std::fs::read_to_string(&cfg_path).ok().and_then(|t| toml::from_str(&t).ok()) {
         Some(c) => c,
-        None => Config { app_id: DEFAULT_APP_ID.to_string(), interval: default_interval(), auto_update: true },
+        None => Config { app_id: DEFAULT_APP_ID.to_string(), interval: default_interval(), auto_update: true, hide_console: true },
     };
     println!("vi-rpc {}", update::VERSION);
     update::clean_old();
+    let start_hidden = cfg.hide_console && !args.iter().any(|a| a == "--console");
     let stop = Arc::new(AtomicBool::new(false));
     let worker = {
         let stop = stop.clone();
@@ -86,7 +90,7 @@ fn main() {
         })
     };
     // the tray runs here; the console starts hidden unless --console was given
-    tray::run(stop.clone(), !args.iter().any(|a| a == "--console"));
+    tray::run(stop.clone(), start_hidden);
     if !stop.load(Ordering::Relaxed) {
         println!("vi-rpc: quit from the tray");
         std::process::exit(0);
