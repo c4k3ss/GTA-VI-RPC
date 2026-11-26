@@ -1,8 +1,8 @@
 <h1 align="center">
   <br>
-  <a href="https://github.com/c4k3ss/vi-rpc"><img src="https://raw.githubusercontent.com/c4k3ss/vi-rpc/main/logo.png" alt="VI RPC" width="200"></a>
+  <a href="https://github.com/c4k3ss/GTA-VI-RPC"><img src="https://raw.githubusercontent.com/c4k3ss/GTA-VI-RPC/main/logo.png" alt="GTA VI RPC" width="200"></a>
   <br>
-  VI RPC
+  GTA VI RPC
   <br>
 </h1>
 
@@ -17,7 +17,7 @@
   <a href="#license">License</a>
 </p>
 
-<p align="center"><img src="https://raw.githubusercontent.com/c4k3ss/vi-rpc/main/presence.png"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/c4k3ss/GTA-VI-RPC/main/presence.png"></p>
 
 ## Key Features
 
@@ -38,7 +38,7 @@ To use your own Discord application instead (your name and art), put `vi-rpc.tom
 
 ## Download
 
-You can [download](https://github.com/c4k3ss/vi-rpc/releases) the latest version for Windows.
+You can [download](https://github.com/c4k3ss/GTA-VI-RPC/releases) the latest version for Windows.
 
 **Requirements:** Windows 10/11, Discord running on your PC, a VIctory-based layer.
 
@@ -53,8 +53,8 @@ The same exe contains the scanner that found those offsets (`vi-rpc clock`, `sca
 ```bash
 # Prerequisites: Rust (stable), Windows
 
-git clone https://github.com/c4k3ss/vi-rpc.git
-cd vi-rpc
+git clone https://github.com/c4k3ss/GTA-VI-RPC.git
+cd GTA-VI-RPC
 cargo build --release
 # target\release\vi-rpc.exe
 ```
