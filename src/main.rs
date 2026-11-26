@@ -106,11 +106,17 @@ fn main() {
     let worker = std::thread::spawn(move || {
         presence(cfg, exit_with_game);
         app::STOP.store(true, Ordering::Relaxed);
+        app::WORKER_DONE.store(true, Ordering::SeqCst);
     });
     // the tray runs here; the console starts hidden unless --console was given
     let quit = tray::run(start_hidden);
     if quit {
         app::STOP.store(true, Ordering::SeqCst);
+        // give the presence thread a moment to clear Discord (it checks STOP every 250 ms)
+        let t0 = Instant::now();
+        while !app::WORKER_DONE.load(Ordering::SeqCst) && t0.elapsed() < Duration::from_secs(3) {
+            std::thread::sleep(Duration::from_millis(50));
+        }
         // never cut an exe swap in half: the updater holds this lock from the first rename to the spawn
         let _swap = app::SWAP.lock().unwrap_or_else(|e| e.into_inner());
         log::say("vi-rpc: quit from the tray");
@@ -129,8 +135,17 @@ fn presence(cfg: Config, exit_with_game: bool) {
     let mut last_shown = String::new();
     let mut seen_game = false;
     let mut cleaned_old = false;
+    // on the way out, leave nothing on Discord
+    let bye = |client: &mut Option<DiscordIpcClient>| {
+        if let Some(c) = client.as_mut() {
+            let _ = c.clear_activity();
+            let _ = c.close();
+        }
+        *client = None;
+    };
     loop {
         if app::STOP.load(Ordering::Relaxed) {
+            bye(&mut client);
             return;
         }
         let manual = app::CHECK_NOW.swap(false, Ordering::Relaxed);
@@ -167,6 +182,7 @@ fn presence(cfg: Config, exit_with_game: bool) {
                 app::set_status(if paused { "Paused" } else { "Waiting for the game" });
                 if exit_with_game && seen_game && !paused {
                     log::say("vi-rpc: exiting with the game (--exit-with-game)");
+                    bye(&mut client);
                     return;
                 }
             }
@@ -251,6 +267,7 @@ fn presence(cfg: Config, exit_with_game: bool) {
         }
         for _ in 0..cfg.interval.clamp(5, 3600) * 4 {
             if app::STOP.load(Ordering::Relaxed) {
+                bye(&mut client);
                 return;
             }
             // Pause, Resume and Check for updates act now, not after the interval

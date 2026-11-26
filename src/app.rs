@@ -7,6 +7,8 @@ pub const REPO_URL: &str = "https://github.com/c4k3ss/GTA-VI-RPC";
 
 /// Set by Quit, by `--exit-with-game` or by an update restart: everyone winds down.
 pub static STOP: AtomicBool = AtomicBool::new(false);
+/// Set by the presence thread once it has cleared Discord and returned; Quit waits briefly for it.
+pub static WORKER_DONE: AtomicBool = AtomicBool::new(false);
 /// "Pause presence" in the tray: keep running, show nothing on Discord.
 pub static PAUSED: AtomicBool = AtomicBool::new(false);
 /// "Check for updates" in the tray: the presence thread checks on its next turn.

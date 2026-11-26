@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, TrayIconBuilder};
-use windows_sys::Win32::System::Console::{AllocConsole, AttachConsole, FreeConsole, GetConsoleMode, GetConsoleWindow, GetStdHandle, SetConsoleTitleW, SetStdHandle, ATTACH_PARENT_PROCESS, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
+use windows_sys::Win32::System::Console::{AllocConsole, AttachConsole, FreeConsole, GetConsoleMode, GetConsoleWindow, GetStdHandle, SetConsoleOutputCP, SetConsoleTitleW, SetStdHandle, ATTACH_PARENT_PROCESS, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
 use windows_sys::Win32::UI::WindowsAndMessaging::{DispatchMessageW, PeekMessageW, TranslateMessage, MSG, PM_REMOVE};
 
 use crate::app;
@@ -19,6 +19,7 @@ pub fn attach_or_alloc_console() {
         if AttachConsole(ATTACH_PARENT_PROCESS) == 0 {
             AllocConsole();
         }
+        SetConsoleOutputCP(65001);
     }
 }
 
@@ -30,6 +31,7 @@ fn show_console(show: bool) {
             if GetConsoleWindow().is_null() && AllocConsole() != 0 {
                 let title: Vec<u16> = format!("GTA VI RPC {}\0", crate::update::VERSION).encode_utf16().collect();
                 SetConsoleTitleW(title.as_ptr());
+                SetConsoleOutputCP(65001); // the lines are UTF-8 ("·")
                 return true;
             }
         } else if !GetConsoleWindow().is_null() {
