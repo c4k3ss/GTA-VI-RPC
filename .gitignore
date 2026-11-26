@@ -2,3 +2,7 @@ target/
 re/*.bin
 target-scan/
 target-scan2/
+__pycache__/
+*.toml
+!Cargo.toml
+!vi-rpc.example.toml

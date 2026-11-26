@@ -1,0 +1,4 @@
+# Copy to vi-rpc.toml next to vi-rpc.exe.
+app_id = "<your Discord application id>"
+# Seconds between presence updates (Discord allows one per 15 s).
+interval = 15
