@@ -25,19 +25,16 @@
 * **Live game state** - Menus, loading and the world, with the in-game clock read from the game itself
 * **Conditional** - Shows up when the game is running, clears when it closes
 * **Nothing touched** - No injection, no patches, no game files; it reads the layer's window and the game's memory
-* **Lightweight** - One small exe, one config file, no runtime to install
+* **Lightweight** - One small exe, nothing to configure, no runtime to install
 
 ## How To Use
 
-1. Create a Discord application at [discord.com/developers](https://discord.com/developers/applications). Its name is what Discord shows as "Playing ...". Under *Rich Presence > Art Assets*, upload an image named `game`.
-2. Put `vi-rpc.toml` next to `vi-rpc.exe` (see `vi-rpc.example.toml`):
-   ```toml
-   app_id = "<your application id>"
-   ```
-3. Run `vi-rpc.exe`. Start the game whenever you like; the presence appears once it runs.
+Run `vi-rpc.exe`, play... done! Start it before or after the game; the presence appears once the game runs and clears when it closes. No account, no setup: the Discord application is the project's own.
 
 > **Note**
-> A layer's launcher can start it for you: add `start "" "<path>\vi-rpc.exe"` above the `victory.exe run ...` line.
+> A layer's launcher can start it for you: add `start "" "<path>i-rpc.exe"` above the `victory.exe run ...` line.
+
+To use your own Discord application instead (your name and art), put `vi-rpc.toml` next to the exe with `app_id = "<your application id>"`; see `vi-rpc.example.toml`.
 
 ## Download
 
