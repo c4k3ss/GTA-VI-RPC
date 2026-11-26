@@ -41,7 +41,7 @@
 Run `vi-rpc.exe`, play... done! Start it before or after the game; the presence appears once the game runs and clears when it closes. No account, no setup: the Discord application is the project's own.
 
 > **Note**
-> A layer's launcher can start it for you: add `start "" "C:\path\to\vi-rpc.exe"` above the `victory.exe run ...` line.
+> A layer's launcher can start it for you: add `start "" "C:\path\to\vi-rpc.exe" --exit-with-game` above the `victory.exe run ...` line; with that flag it quits when the game does.
 
 To use your own Discord application instead (your name and art), put `vi-rpc.toml` next to the exe with `app_id = "<your application id>"`; see `vi-rpc.example.toml`.
 
