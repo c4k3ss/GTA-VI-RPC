@@ -26,9 +26,12 @@
 * **Works with every VIctory-based build** - VIctory, victory-fork, Belobug, DexNom, AvatarManz, CGBJ, Flamingo, VItoriaBr and their forks
 * **Live game state** - Menus, loading and the world, with the in-game clock read from the game itself
 * **Conditional** - Shows up when the game is running, clears when it closes
-* **Tray icon** - Lives in the system tray; its menu shows or hides the console and quits
+* **Tray icon** - Lives in the system tray; its menu pauses the presence, starts it with Windows, shows the console, checks for updates
+* **Pause presence** - One click hides what you are doing without closing the tool
+* **Start with Windows** - Optional, from the tray menu
 * **Nothing touched** - No injection, no patches, no game files; it reads the layer's window and the game's memory
-* **Auto-update** - Fetches new releases itself (on start and every six hours; `auto_update = false` turns it off)
+* **Auto-update** - Fetches new releases itself (on start, every six hours, or from the tray), checks their size and SHA-256 against GitHub, and keeps the previous exe as `vi-rpc.old.exe` until the new one has run for two minutes
+* **Logging** - What it does goes to `%LOCALAPPDATA%i-rpci-rpc.log` and to the console the tray can show
 * **Lightweight** - One small exe, nothing to configure, no runtime to install
 
 ## Upcoming
@@ -38,12 +41,12 @@
 
 ## How To Use
 
-Run `vi-rpc.exe`, play... done! It sits in the system tray (right-click: show the console, quit). Start it before or after the game; the presence appears once the game runs and clears when it closes. No account, no setup: the Discord application is the project's own.
+Run `vi-rpc.exe`, play... done! It sits in the system tray; right-click the icon for **Pause presence**, **Start with Windows**, **Show console**, **Check for updates**, **About** and **Quit**. Hover it to see what is being shown. Start it before or after the game; the presence appears once the game runs and clears when it closes. No account, no setup: the Discord application is the project's own.
 
 > **Note**
 > A layer's launcher can start it for you: add `start "" "C:\path\to\vi-rpc.exe" --exit-with-game` above the `victory.exe run ...` line; with that flag it quits when the game does.
 
-To use your own Discord application instead (your name and art), put `vi-rpc.toml` next to the exe with `app_id = "<your application id>"`; see `vi-rpc.example.toml`.
+Settings go in `vi-rpc.toml` next to the exe; every key is optional (see `vi-rpc.example.toml`): `app_id` for your own Discord application (your name and art), `auto_update`, `hide_console`, `interval`.
 
 ## Download
 

@@ -2,7 +2,7 @@
 //! (VIctory and every fork of it name the window this way; Flamingo adds nothing to it).
 
 use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM};
-use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextLengthW, GetWindowTextW, IsWindowVisible};
+use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Frame {
@@ -10,6 +10,8 @@ pub struct Frame {
     pub fps: f32,
     pub ms: f32,
     pub draws: u32,
+    /// The process that owns the window (0 when parsed from text alone).
+    pub pid: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -28,16 +30,16 @@ impl Frame {
         }
     }
 
-    pub fn details(&self) -> String {
-        match self.scene() {
+    pub fn details_for(&self, scene: Scene) -> String {
+        match scene {
             Scene::Loading => "Loading".to_string(),
             Scene::Menus => "In the menus".to_string(),
             Scene::World => "Playing Story Mode".to_string(),
         }
     }
 
-    pub fn state(&self) -> String {
-        match self.scene() {
+    pub fn state_for(&self, scene: Scene) -> String {
+        match scene {
             // Stage 2 replaces this with "<activity> near <place>" from the title's own state.
             Scene::World => format!("Somewhere in Leonida · {:.0} fps", self.fps),
             _ => format!("{:.0} fps", self.fps),
@@ -53,7 +55,7 @@ impl Frame {
         let ms: f32 = words.next()?.parse().ok()?;
         words.next().filter(|w| *w == "ms/frame")?;
         let draws: u32 = words.next()?.parse().ok()?;
-        Some(Frame { title: name.to_string(), fps, ms, draws })
+        Some(Frame { title: name.to_string(), fps, ms, draws, pid: 0 })
     }
 }
 
@@ -75,7 +77,8 @@ pub fn find() -> Option<Frame> {
             let mut buf = vec![0u16; len as usize + 1];
             let n = GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
             let text = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
-            if let Some(f) = Frame::parse(&text) {
+            if let Some(mut f) = Frame::parse(&text) {
+                GetWindowThreadProcessId(hwnd, &mut f.pid);
                 *found = Some(f);
                 return 0;
             }

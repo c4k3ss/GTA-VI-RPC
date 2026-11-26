@@ -66,7 +66,10 @@ fn pid_of(name: &str) -> Option<u32> {
 
 impl Target {
     pub fn open(process: &str) -> Option<Target> {
-        let pid = pid_of(process)?;
+        Target::open_pid(pid_of(process)?)
+    }
+
+    pub fn open_pid(pid: u32) -> Option<Target> {
         // SAFETY: Toolhelp module walk; OpenProcess for reading only.
         unsafe {
             let handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, pid);
@@ -448,7 +451,12 @@ pub fn find(args: &[String]) {
     }
     places.sort();
     places.dedup();
-    let save = if again { out_dir.join(format!("{tag}{}", if is_clock { "clock-again.txt" } else if is_text { "text-again.txt" } else { "find-again.txt" })) } else { full };
+    let again_file = out_dir.join(format!("{tag}{}", if is_clock { "clock-again.txt" } else if is_text { "text-again.txt" } else { "find-again.txt" }));
+    if !again {
+        // a fresh full scan: the narrowing from the previous one no longer applies
+        let _ = std::fs::remove_file(&again_file);
+    }
+    let save = if again { again_file } else { full };
     let _ = std::fs::write(&save, places.iter().map(|(a, k)| format!("{a:#x} {k}
 ")).collect::<String>());
     let mut by_kind: BTreeMap<&str, usize> = BTreeMap::new();
@@ -664,7 +672,7 @@ pub fn boxes(args: &[String]) {
     let (px, py) = if args.len() >= 2 {
         (args[0].parse::<f32>().expect("x"), args[1].parse::<f32>().expect("y"))
     } else {
-        let title = crate::title::Title::attach().expect("a known title layout");
+        let title = crate::title::Title::attach(0).expect("a known title layout");
         let p = title.camera().expect("the camera position");
         (p[0], p[1])
     };

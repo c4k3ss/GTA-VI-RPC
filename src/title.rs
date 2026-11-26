@@ -56,8 +56,8 @@ pub struct Title {
 
 impl Title {
     /// Attaches to the running layer when its title image is one with a known layout.
-    pub fn attach() -> Option<Title> {
-        let target = Target::open("victory.exe")?;
+    pub fn attach(pid: u32) -> Option<Title> {
+        let target = if pid != 0 { Target::open_pid(pid)? } else { Target::open("victory.exe")? };
         let img = target.image()?;
         let hash = img.name.strip_prefix("victory-image-")?.strip_suffix(".dll")?;
         let layout = LAYOUTS.iter().find(|l| l.image_hash == hash)?;
