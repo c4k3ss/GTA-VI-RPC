@@ -58,3 +58,18 @@ So: details = "Playing Story Mode" (or the mission's name while on one), state =
 
 - Does the user want the reader in Rust or C# (the FL Studio RPC's language)?
 - Discord application id and art assets (a large image for the game; Discord needs them uploaded to the app).
+
+## Street / area: what the 2026-11-28 session found
+
+- The current street is not kept as a fixed string, nor a pointer to the text DB string or record, nor a joaat
+  of any spelling (full-process `find`/`text` sweeps and `--again` narrowing on three streets all came back 0).
+- Street names live in the text DB as arrays of 24-byte small strings (15 chars inline + length|0x80) at
+  0x92fad... (alphabetical, in chunks) and 0x92fa6... (load order); `dump 0x92fa00000 0x200000 pool.bin`
+  gives them all; "Palmetto Ave" also appears in 29 per-language copies around 0x92fb45000.
+- The HUD street label is a TRANSIENT heap string: page-hash sweeps (`pages a1/a2`, move, `pages b`,
+  `pdiff`, still `cand c`, move, `cand d`, still `cand e`) showed the 16-byte std::string "Palmetto Ave" at
+  0x936b87500 in a small-object allocator page, turned into a free-list entry once the label faded. Two more
+  blocks on the same page ({ptr 0x938b77540, 0x230022} at +0x6c0, 0xd7c91750 at +0x700) freed with it.
+- Next: a live watcher. Poll the allocator region (0x936b00000 +- a few MB) for any of the 615 table names;
+  on a hit, scan the UI heap (0x93...-0x94...) for the pointer to that block; `chase` that owner to a fixed
+  image offset. Read the string while shown, keep the last value. The area label should behave the same.
