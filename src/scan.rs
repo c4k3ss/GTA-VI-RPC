@@ -94,8 +94,9 @@ impl Target {
         }
     }
 
+    /// The title's image. Some forks map small `victory-image-*` helpers next to it; the game is the big one.
     pub fn image(&self) -> Option<&Module> {
-        self.modules.iter().find(|m| m.name.starts_with("victory-image-"))
+        self.modules.iter().filter(|m| m.name.starts_with("victory-image-")).max_by_key(|m| m.size)
     }
 
     pub fn owner(&self, addr: usize) -> String {

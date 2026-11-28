@@ -1,5 +1,6 @@
-//! What the layer's window title says: `<title> | VIctory <fps> fps <ms> ms/frame <draws> draws/frame`
-//! (VIctory and every fork of it name the window this way; Flamingo adds nothing to it).
+//! What the layer's window title says: `<title> | VIctory <fps> fps <ms> ms/frame <draws> draws/frame`.
+//! Forks keep the shape and add to it: a suffix on the name (`VIctory-NVIDIA`) and a note after the frame rate
+//! (`13 fps (frame gen 27 fps)`); both are skipped.
 
 use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM};
 use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible};
@@ -46,12 +47,25 @@ impl Frame {
         }
     }
 
-    /// `Americas | VIctory 8 fps 129.9 ms/frame 7577 draws/frame`
+    /// `Americas | VIctory 8 fps 129.9 ms/frame 7577 draws/frame`, or a fork's
+    /// `Americas | VIctory-NVIDIA 13 fps (frame gen 27 fps) 74.8 ms/frame 10214 draws/frame`.
     pub fn parse(title: &str) -> Option<Frame> {
-        let (name, rest) = title.split_once(" | VIctory ")?;
-        let mut words = rest.split_whitespace();
+        let (name, rest) = title.split_once(" | VIctory")?;
+        let mut words = rest.split_whitespace().peekable();
+        // the layer's own name may carry a suffix (`VIctory-NVIDIA`): the first word is it unless it is the number
+        if words.peek().is_some_and(|w| w.parse::<f32>().is_err()) {
+            words.next();
+        }
         let fps: f32 = words.next()?.parse().ok()?;
         words.next().filter(|w| *w == "fps")?;
+        // a parenthesised note, such as `(frame gen 27 fps)`, before the frame time
+        if words.peek().is_some_and(|w| w.starts_with('(')) {
+            for w in words.by_ref() {
+                if w.ends_with(')') {
+                    break;
+                }
+            }
+        }
         let ms: f32 = words.next()?.parse().ok()?;
         words.next().filter(|w| *w == "ms/frame")?;
         let draws: u32 = words.next()?.parse().ok()?;
@@ -103,6 +117,9 @@ mod tests {
         assert_eq!(f.scene(), Scene::World);
         assert_eq!(Frame::parse("Americas | VIctory 30 fps 33.3 ms/frame 87 draws/frame").unwrap().scene(), Scene::Menus);
         assert_eq!(Frame::parse("Americas | VIctory 30 fps 33.3 ms/frame 3 draws/frame").unwrap().scene(), Scene::Loading);
+        let f = Frame::parse("Americas | VIctory-NVIDIA 13 fps (frame gen 27 fps) 74.8 ms/frame 10214 draws/frame").unwrap();
+        assert_eq!((f.title.as_str(), f.fps, f.ms, f.draws), ("Americas", 13.0, 74.8, 10214));
         assert!(Frame::parse("Visual Studio Code").is_none());
+        assert!(Frame::parse("VIctory | VIctory notes").is_none());
     }
 }
