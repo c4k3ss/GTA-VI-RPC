@@ -2,7 +2,6 @@
 rem Clock scan over the game's own image only (its globals), instant. Double-click, enter the 24-hour time the game
 rem shows (5:10 pm = 17 10). First run: full image scan; later runs: narrow the survivors. Pause the game each time.
 cd /d "%~dp0..\target\release"
-elease"
 set /p HOUR=In-game hour, 24h, e.g. 17:
 set /p MIN=In-game minute, e.g. 10:
 if exist img-clock.txt goto again

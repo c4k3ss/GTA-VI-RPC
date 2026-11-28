@@ -4,7 +4,6 @@ rem   1. on street A, press a key                         -> snapshot areaA
 rem   2. further along the SAME street, press a key       -> snapshot areaA2 (filters fields that just drift)
 rem   3. after walking onto ANOTHER street, press a key   -> snapshot areaB
 cd /d "%~dp0..\target\release"
-elease"
 echo On the first street, map closed, press a key.
 pause >nul
 vi-rpc.exe snap areaA

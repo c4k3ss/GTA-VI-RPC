@@ -3,7 +3,6 @@ rem Confirms how the camera block encodes the world position: two snapshots arou
 rem   1. stand still, facing north on the minimap, press a key   -> snapshot north1
 rem   2. walk straight north about 100 m, stop, press a key       -> snapshot north2
 cd /d "%~dp0..\target\release"
-elease"
 echo Stand still, facing north, then press a key.
 pause >nul
 vi-rpc.exe snap north1
