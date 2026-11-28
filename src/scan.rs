@@ -365,8 +365,12 @@ pub fn find(args: &[String]) {
         kinds.push(("u16", t16, 0));
     } else {
         for a in &rest {
-            let v = u32::from_str_radix(a.trim_start_matches("0x"), 16).expect("a hex u32");
-            kinds.push(("u32", v.to_le_bytes().to_vec(), 0));
+            let v = u64::from_str_radix(a.trim_start_matches("0x"), 16).expect("a hex u32 or u64");
+            // a value past 32 bits is a pointer: looked for as 8 bytes
+            match u32::try_from(v) {
+                Ok(v) => kinds.push(("u32", v.to_le_bytes().to_vec(), 0)),
+                Err(_) => kinds.push(("u64", v.to_le_bytes().to_vec(), 0)),
+            }
         }
     }
     let matches = |kind: &str, bytes: &[u8]| -> bool {
@@ -591,6 +595,189 @@ pub fn peek(args: &[String]) {
 /// `vi-rpc diff <still1> <still2> <moved>`: offsets where the two still snapshots agree, and the moved one
 /// differs by a position-like amount: three adjacent f32 (x, y, z) each within +-5000, the moved one 0.5..2000 away
 /// from the still one in the plane. Prints them with the values, saves to diff.txt.
+/// `vi-rpc dump <hex addr> <hex len> <file>`: the bytes of one range of the game's memory to a file (a string
+/// pool, say, to look names up in without another sweep).
+pub fn dump(args: &[String]) {
+    let (Some(addr), Some(len), Some(file)) = (args.first(), args.get(1), args.get(2)) else {
+        eprintln!("usage: vi-rpc dump <hex addr> <hex len> <file>");
+        std::process::exit(2);
+    };
+    let addr = usize::from_str_radix(addr.trim_start_matches("0x"), 16).expect("a hex address");
+    let len = usize::from_str_radix(len.trim_start_matches("0x"), 16).expect("a hex length");
+    let Some(t) = Target::open("victory.exe") else {
+        eprintln!("vi-rpc: victory.exe is not running");
+        std::process::exit(1);
+    };
+    let mut data = vec![0u8; len];
+    let mut off = 0;
+    let mut got = 0;
+    while off < len {
+        let want = CHUNK.min(len - off);
+        let n = t.read(addr + off, &mut data[off..off + want]);
+        got += n;
+        off += want;
+    }
+    let _ = std::fs::write(file, &data);
+    println!("dump {addr:#x}+{len:#x}: {got} of {len} bytes readable, saved {file}");
+}
+
+/// A fast 64-bit hash of a page, 0 for a page of zeros (such pages are left out of the listing).
+fn page_hash(page: &[u8]) -> u64 {
+    let mut h: u64 = 0x243f_6a88_85a3_08d3;
+    let mut any = false;
+    for w in page.chunks_exact(8) {
+        let v = u64::from_le_bytes(w.try_into().unwrap());
+        any |= v != 0;
+        h = (h ^ v).wrapping_mul(0x9E37_79B9_7F4A_7C15).rotate_left(29);
+    }
+    if any { h | 1 } else { 0 }
+}
+
+const PAGE: usize = 4096;
+
+/// `vi-rpc pages <label>`: one sweep of the whole game, a 64-bit hash per 4 KiB page, to `pages-<label>.bin`
+/// (pairs of u64: address, hash; pages of zeros left out). Three of these find a field that changes when the
+/// player crosses into another street or area: two while standing still (what is stable), one after the move
+/// (what changed): see `pdiff`.
+pub fn pages(args: &[String]) {
+    let Some(label) = args.first() else {
+        eprintln!("usage: vi-rpc pages <label>");
+        std::process::exit(2);
+    };
+    let out_dir = std::env::current_exe().unwrap_or_default().with_file_name("");
+    let Some(t) = Target::open("victory.exe") else {
+        eprintln!("vi-rpc: victory.exe is not running");
+        std::process::exit(1);
+    };
+    let mut out: Vec<u8> = Vec::with_capacity(64 << 20);
+    let mut count = 0usize;
+    let (bytes, complete) = t.sweep(budget(), |addr, chunk| {
+        for (i, page) in chunk.chunks(PAGE).enumerate() {
+            if page.len() != PAGE {
+                continue;
+            }
+            let h = page_hash(page);
+            if h != 0 {
+                out.extend_from_slice(&((addr + i * PAGE) as u64).to_le_bytes());
+                out.extend_from_slice(&h.to_le_bytes());
+                count += 1;
+            }
+        }
+    });
+    let file = out_dir.join(format!("pages-{label}.bin"));
+    let _ = std::fs::write(&file, &out);
+    println!("pages {label}: {:.1} GiB{}, {count} non-zero pages, saved {}", bytes as f64 / (1u64 << 30) as f64, if complete { "" } else { " (budget hit)" }, file.display());
+}
+
+fn load_pages(out_dir: &std::path::Path, label: &str) -> std::collections::HashMap<u64, u64> {
+    let data = std::fs::read(out_dir.join(format!("pages-{label}.bin"))).unwrap_or_else(|e| {
+        eprintln!("pages-{label}.bin: {e}");
+        std::process::exit(1)
+    });
+    data.chunks_exact(16).map(|c| (u64::from_le_bytes(c[..8].try_into().unwrap()), u64::from_le_bytes(c[8..].try_into().unwrap()))).collect()
+}
+
+/// `vi-rpc pdiff <still1> <still2> <moved> <label>`: the pages whose hash is the same in the two still listings
+/// and different in the moved one; their bytes are read now and saved to `cand-<label>.bin` (address, 4 KiB
+/// each), the start of a candidate set that `cand` re-reads and `cdiff` compares.
+pub fn pdiff(args: &[String]) {
+    let [a, b, c, label] = args else {
+        eprintln!("usage: vi-rpc pdiff <still1> <still2> <moved> <label>");
+        std::process::exit(2);
+    };
+    let out_dir = std::env::current_exe().unwrap_or_default().with_file_name("");
+    let (pa, pb, pc) = (load_pages(&out_dir, a), load_pages(&out_dir, b), load_pages(&out_dir, c));
+    let mut cands: Vec<u64> = pa.iter().filter(|(k, h)| pb.get(k) == Some(h) && pc.get(k).is_some_and(|hc| hc != *h)).map(|(k, _)| *k).collect();
+    cands.sort_unstable();
+    println!("pdiff: {} pages stable in {a} and {b}, changed in {c}", cands.len());
+    save_cand(&out_dir, label, &cands);
+}
+
+fn save_cand(out_dir: &std::path::Path, label: &str, addrs: &[u64]) {
+    let Some(t) = Target::open("victory.exe") else {
+        eprintln!("vi-rpc: victory.exe is not running");
+        std::process::exit(1);
+    };
+    let mut out: Vec<u8> = Vec::with_capacity(addrs.len() * (8 + PAGE));
+    let mut page = [0u8; PAGE];
+    let mut unreadable = 0;
+    for &addr in addrs {
+        let n = t.read(addr as usize, &mut page);
+        if n != PAGE {
+            unreadable += 1;
+            page.fill(0);
+        }
+        out.extend_from_slice(&addr.to_le_bytes());
+        out.extend_from_slice(&page);
+    }
+    let file = out_dir.join(format!("cand-{label}.bin"));
+    let _ = std::fs::write(&file, &out);
+    println!("cand {label}: {} pages ({} unreadable now), saved {}", addrs.len(), unreadable, file.display());
+}
+
+fn load_cand(out_dir: &std::path::Path, label: &str) -> Vec<(u64, Vec<u8>)> {
+    let data = std::fs::read(out_dir.join(format!("cand-{label}.bin"))).unwrap_or_else(|e| {
+        eprintln!("cand-{label}.bin: {e}");
+        std::process::exit(1)
+    });
+    data.chunks_exact(8 + PAGE).map(|c| (u64::from_le_bytes(c[..8].try_into().unwrap()), c[8..].to_vec())).collect()
+}
+
+/// `vi-rpc cand <from> <label>`: re-reads the pages of `cand-<from>.bin` now, to `cand-<label>.bin`.
+pub fn cand(args: &[String]) {
+    let [from, label] = args else {
+        eprintln!("usage: vi-rpc cand <from> <label>");
+        std::process::exit(2);
+    };
+    let out_dir = std::env::current_exe().unwrap_or_default().with_file_name("");
+    let addrs: Vec<u64> = load_cand(&out_dir, from).into_iter().map(|(a, _)| a).collect();
+    save_cand(&out_dir, label, &addrs);
+}
+
+/// `vi-rpc cdiff <still1> <still2> <moved>`: over the candidate pages, the 4-byte fields equal in the two still
+/// readings and different in the moved one, with both values. Saves `cdiff.txt`. Fields of a page that is
+/// unreadable in any reading are left out.
+pub fn cdiff(args: &[String]) {
+    let [a, b, c] = args else {
+        eprintln!("usage: vi-rpc cdiff <still1> <still2> <moved>");
+        std::process::exit(2);
+    };
+    let out_dir = std::env::current_exe().unwrap_or_default().with_file_name("");
+    let (ca, cb, cc) = (load_cand(&out_dir, a), load_cand(&out_dir, b), load_cand(&out_dir, c));
+    let index = |v: &Vec<(u64, Vec<u8>)>| v.iter().map(|(k, p)| (*k, p.clone())).collect::<std::collections::HashMap<u64, Vec<u8>>>();
+    let (mb, mc) = (index(&cb), index(&cc));
+    let mut hits: Vec<(u64, u32, u32)> = Vec::new();
+    let mut pages_changed = 0;
+    for (addr, pa) in &ca {
+        let (Some(pb), Some(pc)) = (mb.get(addr), mc.get(addr)) else { continue };
+        if pa.iter().all(|&x| x == 0) || pb.iter().all(|&x| x == 0) || pc.iter().all(|&x| x == 0) {
+            continue;
+        }
+        let mut any = false;
+        for off in (0..PAGE).step_by(4) {
+            let w = |p: &[u8]| u32::from_le_bytes(p[off..off + 4].try_into().unwrap());
+            let (va, vb, vc) = (w(pa), w(pb), w(pc));
+            if va == vb && vb != vc {
+                hits.push((addr + off as u64, vb, vc));
+                any = true;
+            }
+        }
+        pages_changed += any as usize;
+    }
+    println!("cdiff: {} fields stable in {a} and {b}, changed in {c}, over {pages_changed} pages", hits.len());
+    let mut text = String::new();
+    for (addr, x, y) in &hits {
+        let line = format!("{addr:#x} {x:#x} -> {y:#x}   ({x} -> {y}; f32 {} -> {})", f32::from_bits(*x), f32::from_bits(*y));
+        text += &line;
+        text += "\n";
+    }
+    for (addr, x, y) in hits.iter().take(80) {
+        println!("  {addr:#x}: {x:#x} -> {y:#x}  ({x} -> {y})");
+    }
+    let _ = std::fs::write(out_dir.join("cdiff.txt"), text);
+    println!("saved {}", out_dir.join("cdiff.txt").display());
+}
+
 pub fn snap(args: &[String]) {
     let out_dir = std::env::current_exe().unwrap_or_default().with_file_name("");
     match args.first().map(String::as_str) {
